@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+	<meta charset="utf-8">
+
+	<head>
+		<title>Refugees Image Mining</title>
+	    <script type="text/javascript" src="lib/d3.min.js"></script> 
+    	<script type="text/javascript" src="lib/underscore-min.js"></script> 
+	    <style type="text/css">
+			.x.axis path {
+			  display: none;
+			}
+	    </style>
+	</head>
+
+	<body>
+
+		<script type="text/javascript">
+
+		var margin = {top: 200, right: 200, bottom: 0, left: 250},
+			width = 900,
+			graphWidth = 550,
+			height = 650;
+
+		var labels = ["Migrants/refugees","Officials (law)","Officials (pol)","Protesters (pro)","Protesters (contra)","Close up (face)","Children","Physical border","Groups (ref)","Groups (off)","Transport (land)","Transport (sea)","Moving (ref)","Waiting (ref)","Physical violence","Graph","Other map"];
+
+		var refC = "#6baed6";
+
+		var migC = "#fd8d3c";
+
+		var x = d3.scale.ordinal().domain(labels)
+			.rangePoints([0, graphWidth]);
+
+		var c = d3.scale.category20c();
+
+		var xAxis = d3.svg.axis()
+			.scale(x)
+			.orient("top");
+
+		var svg = d3.select("body").append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			.style("margin-left", margin.left + "px")
+			.append("g")
+			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+		var urlRef;		
+
+		d3.csv("imageCodingRef.csv")
+		    .row(function(d) { 
+		    	return d;
+		    })
+		    .get(function(error, rows) {
+		    	urlRef = rows;
+		    });		
+
+		var lastCircle = null;	
+
+		var first = true;
+
+
+		function overCircle(c) {
+			if(lastCircle != null && d3.select(this).attr("code") != d3.select(lastCircle).attr("code") || first) {
+				d3.select(this).style("stroke","black").style("stroke-width","1");
+			}			
+		}
+
+		function outCircle(c) {
+			if(lastCircle != null && d3.select(this).attr("code") != d3.select(lastCircle).attr("code") || first) {
+				d3.select(this).style("stroke",null);
+			}
+		}				
+
+		function clickCircle(c) {
+
+			first = false;
+
+			d3.select(lastCircle).style("stroke",null);
+
+			lastCircle = this;
+
+			d3.select(this).style("stroke","black").style("stroke-width","3");
+
+            var tmp = d3.select(this).attr("code");
+            var row = tmp.split("|")[0];
+            var coll = tmp.split("|")[1];
+            var url = urlRef[row][coll];
+
+            d3.select("g.image").remove();            
+
+            var g = svg.append("g").attr("class","image");
+
+            g.append("image")
+		      .attr("xlink:href", url)
+		      .attr("x", graphWidth + 40)
+		      .attr("y", "10px")
+		      .attr("width", "400px")
+		      .attr("height", "400px");
+		}	
+
+		d3.csv("imageCodingPercent.csv")
+		    .row(function(d) { 
+		    	return d;
+		    })
+		    .get(function(error, rows) {  
+
+				svg.append("g")
+					.attr("class", "x axis")
+					.call(xAxis)
+					.selectAll("text")  
+			            .style("text-anchor", "start")
+			            .style("font-family", "Verdana,sans-serif")
+			            .style("font-size", "13px")
+			            .attr("dx", ".8em")
+			            .attr("dy", ".15em")
+			            .attr("transform", "rotate(-65)" );		            
+
+			    for ( var i = 0; i < rows.length; i++ ) {
+
+			    	var codingValues = _.map(_.values(_.omit(rows[i],["Language","Type","Query"])),function(v){return parseFloat(v)});
+			    	var codingKeys   = _.keys(_.omit(rows[i],["Language","Type","Query"]));
+
+			    	var g = svg.append("g").attr("class","coding");
+
+			    	var xScale = d3.scale.ordinal()
+						.domain(codingKeys)
+						.rangePoints([0, graphWidth]);
+
+					var rScale = d3.scale.linear()
+						.domain([0, d3.max(codingValues)])
+						.range([0, 15]);
+
+					var circles = g.selectAll("circle").data(codingValues).enter().append("circle");	
+
+					circles
+						.attr("cx", function(d, j) { 
+							return xScale(codingKeys[j]); 
+						})
+						.attr("cy", i*35+20)
+						.attr("r", function(d, j) { 
+							return rScale(codingValues[j]); 
+						})
+						.attr("code", function(d, j) {
+							return i + "|" + codingKeys[j];
+						})
+						.on("mouseover", overCircle)
+						.on("mouseout", outCircle)
+						.on("click", clickCircle);
+
+					var textType = g.selectAll("text").data(rows[i].Type).enter().append("text");						
+
+					textType
+						.attr("y", i*35+25)
+						.attr("x",function(d, i) { return -180; })
+			            .style("font-family", "Verdana,sans-serif")
+			            .style("font-size", "13px")						
+						.attr("class","value");	
+
+					var textLang = g.selectAll("text").data(rows[i].Language).enter().append("text");						
+
+					textLang
+						.attr("y", i*35+25+16)
+						.attr("x",function(d, i) { return -250; })
+			            .style("font-family", "Verdana,sans-serif")
+			            .style("font-size", "13px")
+			            .text(rows[i].Language);																
+
+					if ( rows[i].Type == "REF" ) {
+						circles.style("fill", refC);
+						textType.text(rows[i].Query).style("fill", refC);
+
+					} else {
+						circles.style("fill", migC);
+						textType.text(rows[i].Query).style("fill", migC);
+
+					}					    	
+
+			    }	    	
+		    });
+
+		</script>
+
+	</body>
+</html>
